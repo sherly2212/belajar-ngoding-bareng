@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+bun.lockb
+
+# Environment Variables
+.env
+.env*.local
+!.env.example
+
+# Build & Output
+dist/
+build/
+*.log
+
+# Editor & OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Legacy / Temp directory
+app/
