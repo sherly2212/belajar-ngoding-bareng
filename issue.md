@@ -1,35 +1,30 @@
-# API Get Current User
+# API Logout User
 
 ## Deskripsi
 
-Buatkan API untuk mendapatkan data user yang sedang login berdasarkan token di header `Authorization`.
+Buatkan API untuk logout user yang sedang login. Saat logout berhasil, data session dengan token tersebut harus **dihapus dari tabel `sessions`** di database.
 
 ## Endpoint
 
 ```
-GET /api/users/current
+DELETE /api/users/logout
 ```
 
 ### Headers
 
-| Header          | Contoh Nilai         | Keterangan                                      |
-| --------------- | -------------------- | ----------------------------------------------- |
-| `Authorization` | `Bearer <token>`     | Token yang didapat dari API login (`POST /api/users/login`) dan tersimpan di tabel `sessions` |
+| Header          | Contoh Nilai     | Keterangan                                                                                    |
+| --------------- | ---------------- | --------------------------------------------------------------------------------------------- |
+| `Authorization` | `Bearer <token>` | Token yang didapat dari API login (`POST /api/users/login`) dan tersimpan di tabel `sessions` |
 
 ### Response Body (Success)
 
 ```json
 {
-  "data": {
-    "id": 1,
-    "name": "eko",
-    "email": "eko@localhost",
-    "created_at": "timestamp"
-  }
+  "data": "OK"
 }
 ```
 
-> **PENTING:** Field `password` **tidak boleh** ikut dikembalikan di response.
+HTTP Status: `200`
 
 ### Response Body (Error — token tidak valid atau tidak ada)
 
@@ -47,124 +42,144 @@ HTTP Status: `401`
 
 Semua perubahan dilakukan di file yang **sudah ada**, jangan membuat file baru.
 
-| Folder       | File                  | Keterangan                  |
-| ------------ | --------------------- | --------------------------- |
-| `src/routes` | `users-route.ts`      | Tambahkan endpoint GET baru |
-| `src/services` | `users-service.ts`  | Tambahkan fungsi service baru |
+| Folder         | File              | Keterangan                       |
+| -------------- | ----------------- | -------------------------------- |
+| `src/routes`   | `users-route.ts`  | Tambahkan endpoint DELETE baru   |
+| `src/services` | `users-service.ts`| Tambahkan fungsi service baru    |
+
+---
+
+## Konteks Kode yang Sudah Ada
+
+Sebelum mulai, pahami struktur file yang sudah ada:
+
+### `src/db/schema.ts`
+
+Berisi definisi tabel database. Tabel yang relevan untuk fitur ini:
+
+```ts
+export const sessions = mysqlTable("sessions", {
+  id: int().primaryKey().autoincrement(),
+  token: varchar({ length: 255 }).notNull(),
+  userId: int("user_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+```
+
+### `src/services/users-service.ts`
+
+File ini sudah memiliki 3 fungsi:
+- `registerUser(input)` — registrasi user baru
+- `loginUser(input)` — login dan buat session
+- `getCurrentUser(token)` — ambil data user dari token
+
+Semua fungsi sudah menggunakan `db`, `eq` dari drizzle-orm, dan import `sessions` & `users` dari schema — **tidak perlu import tambahan**.
+
+### `src/routes/users-route.ts`
+
+File ini sudah memiliki 3 endpoint yang di-chain dalam satu `usersRoute`:
+- `POST /` — registrasi
+- `POST /login` — login
+- `GET /current` — get current user
 
 ---
 
 ## Tahapan Implementasi
 
-### Tahap 1 — Tambahkan fungsi `getCurrentUser` di `src/services/users-service.ts`
+### Tahap 1 — Tambahkan fungsi `logoutUser` di `src/services/users-service.ts`
 
-File saat ini sudah memiliki fungsi `registerUser` dan `loginUser`. Tambahkan fungsi baru **di bawah** fungsi `loginUser`.
+Tambahkan fungsi baru **di bawah** fungsi `getCurrentUser` yang sudah ada (di bagian paling bawah file).
 
 **Yang harus dilakukan:**
 
-1. Buat fungsi `export async function getCurrentUser(token: string)`.
-2. Di dalam fungsi:
-   - Query tabel `sessions` untuk mencari session berdasarkan `token` yang diberikan.
-     ```ts
-     const foundSessions = await db
-       .select()
-       .from(sessions)
-       .where(eq(sessions.token, token))
-       .limit(1);
-     ```
-   - Jika session tidak ditemukan, throw error dengan message `"Unauthorized"` dan set `status = 401`:
-     ```ts
-     if (!foundSessions[0]) {
-       const error = new Error("Unauthorized");
-       (error as any).status = 401;
-       throw error;
-     }
-     ```
-   - Jika session ditemukan, ambil `userId` dari session, lalu query tabel `users` untuk mendapatkan data user. **Jangan select field `password`** — gunakan select spesifik:
-     ```ts
-     const foundUsers = await db
-       .select({
-         id: users.id,
-         name: users.name,
-         email: users.email,
-         created_at: users.createdAt,
-       })
-       .from(users)
-       .where(eq(users.id, foundSessions[0].userId))
-       .limit(1);
-     ```
-   - Jika user tidak ditemukan (edge case), throw error yang sama (`"Unauthorized"`, status `401`).
-   - Jika user ditemukan, kembalikan:
-     ```ts
-     return {
-       data: foundUsers[0],
-     };
-     ```
+1. Buat fungsi `export async function logoutUser(token: string)`.
 
-**Import yang sudah ada dan bisa dipakai:** `eq` dari `drizzle-orm`, `db` dari `../db`, `sessions` dan `users` dari `../db/schema` — semua sudah di-import di file ini.
+2. Di dalam fungsi, pertama cek apakah token ada di tabel `sessions`:
+   ```ts
+   const foundSessions = await db
+     .select()
+     .from(sessions)
+     .where(eq(sessions.token, token))
+     .limit(1);
+   ```
+
+3. Jika session tidak ditemukan, throw error `"Unauthorized"` dengan status `401`:
+   ```ts
+   if (!foundSessions[0]) {
+     const error = new Error("Unauthorized");
+     (error as any).status = 401;
+     throw error;
+   }
+   ```
+
+4. Jika session ditemukan, **hapus** session tersebut dari tabel `sessions`:
+   ```ts
+   await db.delete(sessions).where(eq(sessions.token, token));
+   ```
+
+5. Return response sukses:
+   ```ts
+   return {
+     data: "OK",
+   };
+   ```
+
+**Import yang sudah ada dan bisa dipakai:** `eq` dari `drizzle-orm`, `db` dari `../db`, `sessions` dari `../db/schema` — semua sudah di-import, tidak perlu menambahkan import baru.
 
 ---
 
-### Tahap 2 — Tambahkan endpoint `GET /api/users/current` di `src/routes/users-route.ts`
+### Tahap 2 — Tambahkan endpoint `DELETE /api/users/logout` di `src/routes/users-route.ts`
 
-File saat ini sudah memiliki 2 endpoint: `POST /` (registrasi) dan `POST /login`. Tambahkan endpoint GET baru **setelah** `.post("/login", ...)` dengan cara method chaining.
+Tambahkan endpoint baru **setelah** `.get("/current", ...)` dengan cara method chaining (sambung di akhir chain yang sudah ada).
 
 **Yang harus dilakukan:**
 
-1. Import `getCurrentUser` dari `../services/users-service`:
+1. Tambahkan `logoutUser` ke import dari `../services/users-service`:
    ```ts
-   import { getCurrentUser, loginUser, registerUser } from "../services/users-service";
+   import { getCurrentUser, loginUser, logoutUser, registerUser } from "../services/users-service";
    ```
 
-2. Tambahkan endpoint baru di akhir chain (setelah `.post("/login", ...)`):
+2. Tambahkan endpoint DELETE baru di akhir chain `usersRoute`:
    ```ts
-   .get(
-     "/current",
-     async ({ headers, set }) => {
-       try {
-         // Ambil header Authorization
-         const authorization = headers["authorization"];
+   .delete("/logout", async ({ headers, set }) => {
+     try {
+       // Ambil header Authorization
+       const authorization = headers["authorization"];
 
-         // Validasi format "Bearer <token>"
-         if (!authorization || !authorization.startsWith("Bearer ")) {
-           set.status = 401;
-           return { error: "Unauthorized" };
-         }
-
-         // Ekstrak token (hilangkan prefix "Bearer ")
-         const token = authorization.slice(7);
-
-         const result = await getCurrentUser(token);
-         return result;
-       } catch (error: any) {
-         set.status = error.status || 500;
-         return { error: error?.message || "Internal server error" };
+       // Validasi format "Bearer <token>"
+       if (!authorization || !authorization.startsWith("Bearer ")) {
+         set.status = 401;
+         return { error: "Unauthorized" };
        }
+
+       // Ekstrak token (hilangkan prefix "Bearer ")
+       const token = authorization.slice(7);
+
+       const result = await logoutUser(token);
+       return result;
+     } catch (error: any) {
+       set.status = error.status || 500;
+       return { error: error?.message || "Internal server error" };
      }
-   )
+   });
    ```
 
-**Catatan:** Endpoint ini tidak memerlukan `body` validator karena menggunakan method GET dan hanya membaca dari header.
+   > **Catatan:** Pastikan endpoint ini menggantikan titik koma (`;`) di akhir `.get("/current", ...)`. Method chaining harus menyambung tanpa titik koma di tengah-tengah, dan titik koma hanya ada di endpoint paling akhir.
+
+**Catatan:** Endpoint ini tidak memerlukan `body` validator karena method DELETE dan hanya membaca dari header.
 
 ---
 
 ### Tahap 3 — Testing Manual
 
-Setelah implementasi selesai, lakukan testing manual:
+Setelah implementasi selesai, lakukan testing manual dengan langkah berikut:
 
 1. **Jalankan server:**
    ```bash
    bun run dev
    ```
 
-2. **Registrasi user baru** (jika belum ada):
-   ```bash
-   curl -X POST http://localhost:3000/api/users \
-     -H "Content-Type: application/json" \
-     -d '{"name": "eko", "email": "eko@localhost", "password": "rahasia123"}'
-   ```
-
-3. **Login untuk mendapatkan token:**
+2. **Login untuk mendapatkan token** (gunakan user yang sudah ada, atau registrasi dulu jika belum ada):
    ```bash
    curl -X POST http://localhost:3000/api/users/login \
      -H "Content-Type: application/json" \
@@ -172,23 +187,41 @@ Setelah implementasi selesai, lakukan testing manual:
    ```
    Catat token yang dikembalikan di field `data`.
 
-4. **Test GET current user (success):**
-   ```bash
-   curl http://localhost:3000/api/users/current \
-     -H "Authorization: Bearer <token-dari-langkah-3>"
+3. **Verifikasi token ada di database** (opsional, cek via MySQL client):
+   ```sql
+   SELECT * FROM sessions WHERE token = '<token>';
    ```
-   **Expected:** Status `200`, body berisi `data` dengan `id`, `name`, `email`, `created_at`. **Tidak ada field `password`.**
 
-5. **Test GET current user (tanpa header Authorization):**
+4. **Test DELETE logout (success):**
    ```bash
-   curl http://localhost:3000/api/users/current
+   curl -X DELETE http://localhost:3000/api/users/logout \
+     -H "Authorization: Bearer <token-dari-langkah-2>"
+   ```
+   **Expected:** Status `200`, body `{"data": "OK"}`.
+
+5. **Verifikasi token sudah terhapus dari database:**
+   ```sql
+   SELECT * FROM sessions WHERE token = '<token>';
+   ```
+   **Expected:** Tidak ada hasil (0 rows).
+
+6. **Test menggunakan token yang sudah di-logout (token tidak valid lagi):**
+   ```bash
+   curl -X DELETE http://localhost:3000/api/users/logout \
+     -H "Authorization: Bearer <token-yang-sama>"
    ```
    **Expected:** Status `401`, body `{"error": "Unauthorized"}`.
 
-6. **Test GET current user (token tidak valid):**
+7. **Test tanpa header Authorization:**
    ```bash
-   curl http://localhost:3000/api/users/current \
-     -H "Authorization: Bearer token-asal-asalan"
+   curl -X DELETE http://localhost:3000/api/users/logout
+   ```
+   **Expected:** Status `401`, body `{"error": "Unauthorized"}`.
+
+8. **Test dengan token asal-asalan:**
+   ```bash
+   curl -X DELETE http://localhost:3000/api/users/logout \
+     -H "Authorization: Bearer token-tidak-valid"
    ```
    **Expected:** Status `401`, body `{"error": "Unauthorized"}`.
 
@@ -196,11 +229,13 @@ Setelah implementasi selesai, lakukan testing manual:
 
 ## Checklist
 
-- [ ] Fungsi `getCurrentUser(token)` ditambahkan di `src/services/users-service.ts`
-- [ ] Password **tidak** ikut di-select dari database
+- [ ] Fungsi `logoutUser(token)` ditambahkan di `src/services/users-service.ts`
+- [ ] Session dengan token tersebut dihapus dari tabel `sessions` saat logout berhasil
 - [ ] Token tidak valid → throw error `"Unauthorized"` dengan status `401`
-- [ ] Endpoint `GET /api/users/current` ditambahkan di `src/routes/users-route.ts`
+- [ ] Endpoint `DELETE /api/users/logout` ditambahkan di `src/routes/users-route.ts`
+- [ ] Import `logoutUser` ditambahkan di `users-route.ts`
 - [ ] Header `Authorization` diparsing dengan format `Bearer <token>`
 - [ ] Tanpa header / format salah → langsung return `401`
-- [ ] Testing: success case mengembalikan data user tanpa password
-- [ ] Testing: error case mengembalikan `{"error": "Unauthorized"}` dengan status `401`
+- [ ] Testing: success case mengembalikan `{"data": "OK"}` dan session terhapus dari DB
+- [ ] Testing: token yang sudah di-logout tidak bisa dipakai lagi (return `401`)
+- [ ] Testing: tanpa header → return `401`
