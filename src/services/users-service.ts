@@ -76,3 +76,38 @@ export async function loginUser(input: LoginUserInput) {
     data: token,
   };
 }
+
+export async function getCurrentUser(token: string) {
+  const foundSessions = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.token, token))
+    .limit(1);
+
+  if (!foundSessions[0]) {
+    const error = new Error("Unauthorized");
+    (error as any).status = 401;
+    throw error;
+  }
+
+  const foundUsers = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      created_at: users.createdAt,
+    })
+    .from(users)
+    .where(eq(users.id, foundSessions[0].userId))
+    .limit(1);
+
+  if (!foundUsers[0]) {
+    const error = new Error("Unauthorized");
+    (error as any).status = 401;
+    throw error;
+  }
+
+  return {
+    data: foundUsers[0],
+  };
+}
