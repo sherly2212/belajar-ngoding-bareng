@@ -15,6 +15,13 @@
       "when": 1790566263585,
       "tag": "0001_ambiguous_black_bird",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1790576449204,
+      "tag": "0002_cynical_yellow_claw",
+      "breakpoints": true
     }
   ]
 }
