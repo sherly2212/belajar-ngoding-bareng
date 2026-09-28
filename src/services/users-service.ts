@@ -1,9 +1,14 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db";
-import { users } from "../db/schema";
+import { sessions, users } from "../db/schema";
 
 export interface RegisterUserInput {
   name: string;
+  email: string;
+  password: string;
+}
+
+export interface LoginUserInput {
   email: string;
   password: string;
 }
@@ -34,5 +39,40 @@ export async function registerUser(input: RegisterUserInput) {
 
   return {
     data: "OK",
+  };
+}
+
+export async function loginUser(input: LoginUserInput) {
+  const foundUsers = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, input.email))
+    .limit(1);
+
+  const user = foundUsers[0];
+
+  // Pesan error dibuat sama untuk email tidak ada dan password salah
+  const loginError = new Error("Email atau password salah");
+  (loginError as any).status = 400;
+
+  if (!user) {
+    throw loginError;
+  }
+
+  const isMatch = await Bun.password.verify(input.password, user.password);
+
+  if (!isMatch) {
+    throw loginError;
+  }
+
+  const token = crypto.randomUUID();
+
+  await db.insert(sessions).values({
+    token,
+    userId: user.id,
+  });
+
+  return {
+    data: token,
   };
 }
