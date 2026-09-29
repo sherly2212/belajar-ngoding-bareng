@@ -1,10 +1,12 @@
 import { Elysia } from "elysia";
+import { swagger } from "@elysiajs/swagger";
 import { config } from "./config";
 import { apiRoutes } from "./routes";
 import { healthRoutes } from "./routes/health";
 import { usersRoute } from "./routes/users-route";
 
 const app = new Elysia()
+  .use(swagger())
   .use(apiRoutes)
   .use(healthRoutes)
   .use(usersRoute)
@@ -12,6 +14,10 @@ const app = new Elysia()
 
 console.log(
   `🚀 Server is running at http://${app.server?.hostname}:${app.server?.port}`
+);
+
+console.log(
+  `📚 Swagger docs available at http://${app.server?.hostname}:${app.server?.port}/swagger`
 );
 
 export default app;

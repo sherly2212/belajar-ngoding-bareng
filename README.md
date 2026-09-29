@@ -1,98 +1,177 @@
-# Belajar Ngoding Bareng - Backend API
+# Belajar Ngoding Bareng
 
-Boilerplate backend API modular dan scalable menggunakan **Bun**, framework **ElysiaJS**, ORM **Drizzle**, dan database **MySQL**.
+Aplikasi backend sederhana untuk belajar membangun REST API dengan autentikasi user, dibuat sambil mengikuti tutorial "vibe coding".
 
----
+## Tentang Aplikasi
 
-## 🛠️ Tech Stack
+Aplikasi ini menyediakan API untuk registrasi, login, melihat data user yang sedang login, dan logout. Password disimpan dalam bentuk hash (bcrypt), dan sesi login dikelola menggunakan token di tabel `sessions`.
 
-- **Runtime & Package Manager**: [Bun](https://bun.sh/)
-- **Language**: TypeScript
-- **Web Framework**: [ElysiaJS](https://elysiajs.com/)
-- **ORM & Migrations**: [Drizzle ORM](https://orm.drizzle.team/) + `drizzle-kit`
-- **Database Driver**: `mysql2`
+## Technology Stack
+
+- **Runtime**: [Bun](https://bun.sh)
+- **Web Framework**: [ElysiaJS](https://elysiajs.com)
+- **ORM**: [Drizzle ORM](https://orm.drizzle.team)
 - **Database**: MySQL
+- **Bahasa**: TypeScript
+- **Testing**: `bun test` (bawaan Bun)
 
----
+## Library yang Digunakan
 
-## 📁 Struktur Direktori
+| Library | Kegunaan |
+|---|---|
+| `elysia` | Framework web untuk membuat routing dan HTTP server |
+| `drizzle-orm` | ORM untuk berkomunikasi dengan database MySQL |
+| `mysql2` | Driver koneksi ke database MySQL |
+| `drizzle-kit` | Tool untuk membuat migrasi database dari skema Drizzle |
 
-```text
-├── drizzle/              # File migrasi SQL hasil generate Drizzle
+## Struktur Folder
+belajar-ngoding-bareng/
 ├── src/
-│   ├── config/           # Konfigurasi aplikasi & environment variables
-│   │   └── index.ts
-│   ├── db/               # Koneksi database MySQL & skema Drizzle
-│   │   ├── index.ts
-│   │   └── schema.ts
-│   ├── routes/           # Endpoint & routing ElysiaJS
-│   │   ├── health.ts     # Health-check route
-│   │   └── index.ts      # Root API route
-│   └── index.ts          # Entry point aplikasi server
-├── .env.example          # Template environment variable
-├── drizzle.config.ts     # Konfigurasi Drizzle Kit
-├── package.json
-└── tsconfig.json
-```
+│ ├── index.ts # Entry point, menjalankan server
+│ ├── config/
+│ │ └── index.ts # Konfigurasi aplikasi (baca dari .env)
+│ ├── db/
+│ │ ├── index.ts # Koneksi database
+│ │ └── schema.ts # Skema tabel (users, sessions)
+│ ├── routes/
+│ │ ├── index.ts # Gabungan semua routing
+│ │ ├── health.ts # Endpoint GET /health
+│ │ └── users-route.ts # Endpoint terkait user (register, login, dll)
+│ └── services/
+│ └── users-service.ts # Logika bisnis (hashing, validasi, query DB)
+├── tests/
+│ └── users.test.ts # Unit test untuk semua fungsi di users-service.ts
+├── drizzle/ # File migrasi database (dibuat otomatis oleh drizzle-kit)
+├── drizzle.config.ts # Konfigurasi Drizzle Kit
+└── .env # Variabel environment (PORT, DATABASE_URL)
 
----
+**Pola penamaan file**: routing memakai akhiran `-route.ts` (contoh: `users-route.ts`), logika bisnis memakai akhiran `-service.ts` (contoh: `users-service.ts`). Ini memisahkan urusan HTTP (routing) dari logika sebenarnya (service), supaya lebih mudah dites dan dirawat.
 
-## 🚀 Memulai (Getting Started)
+## Schema Database
 
-### 1. Prasyarat
-- Pastikan [Bun](https://bun.sh/) telah terpasang (`bun --version`).
-- Database MySQL sudah berjalan secara lokal atau remote.
+### Tabel `users`
 
-### 2. Instalasi Dependency
-```bash
-bun install
-```
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `id` | INTEGER | Primary Key, Auto Increment |
+| `name` | VARCHAR(255) | Not Null |
+| `email` | VARCHAR(255) | Not Null, Unique |
+| `password` | VARCHAR(255) | Not Null (hash bcrypt) |
+| `created_at` | TIMESTAMP | Not Null, Default CURRENT_TIMESTAMP |
 
-### 3. Konfigurasi Lingkungan (.env)
-Salin template `.env.example` menjadi `.env`:
-```bash
-cp .env.example .env
-```
-Sesuaikan konfigurasi database dan port:
-```env
-PORT=3000
-DATABASE_URL=mysql://root:password@localhost:3306/belajar_db
-```
+### Tabel `sessions`
 
-### 4. Database Migrations / Schema Sync
-Sinkronisasikan skema tabel ke database MySQL:
-```bash
-# Push skema langsung ke database (pengembangan cepat)
-bun run db:push
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `id` | INTEGER | Primary Key, Auto Increment |
+| `token` | VARCHAR(255) | Not Null (UUID token login) |
+| `user_id` | INTEGER | Foreign Key ke `users.id` |
+| `created_at` | TIMESTAMP | Not Null, Default CURRENT_TIMESTAMP |
 
-# Atau generate file migrasi SQL
-bun run db:generate
-```
+## API yang Tersedia
 
-### 5. Menjalankan Server
-```bash
-# Mode development (dengan live-reload)
-bun run dev
+### `GET /`
+Menampilkan info dasar aplikasi.
 
-# Mode production
-bun run start
-```
-Server akan aktif di `http://localhost:3000`.
+### `GET /health`
+Mengecek status server dan koneksi database.
 
----
+### `POST /api/users`
+Registrasi user baru.
 
-## 📡 Daftar Endpoint Dasar
-
-| Method | Endpoint  | Deskripsi |
-| :--- | :--- | :--- |
-| `GET` | `/` | Informasi status API |
-| `GET` | `/health` | Pemeriksaan kesehatan server dan koneksi MySQL |
-
-Contoh respons `/health`:
+**Request Body:**
 ```json
 {
-  "status": "ok",
-  "timestamp": "2026-09-28T01:47:49.173Z",
-  "database": "connected"
+  "name": "Sherly",
+  "email": "sherly@example.com",
+  "password": "rahasia123"
 }
 ```
+
+**Response Sukses:**
+```json
+{ "data": "OK" }
+```
+
+**Response Gagal (email sudah terdaftar):**
+```json
+{ "error": "Email sudah terdaftar" }
+```
+
+### `POST /api/users/login`
+Login user.
+
+**Request Body:**
+```json
+{
+  "email": "sherly@example.com",
+  "password": "rahasia123"
+}
+```
+
+**Response Sukses:**
+```json
+{ "data": "<token>" }
+```
+
+**Response Gagal:**
+```json
+{ "error": "Email atau password salah" }
+```
+
+### `GET /api/users/current`
+Mendapatkan data user yang sedang login.
+
+**Header:**
+
+**Response Sukses:**
+```json
+{
+  "data": {
+    "id": 1,
+    "name": "Sherly",
+    "email": "sherly@example.com",
+    "created_at": "2026-09-28T00:00:00.000Z"
+  }
+}
+```
+
+### `DELETE /api/users/logout`
+Logout user, menghapus session/token.
+
+**Header:**
+
+**Response Sukses:**
+```json
+{ "data": "OK" }
+```
+
+## Cara Setup Project
+
+1. Install [Bun](https://bun.sh) (versi 1.4 ke atas).
+2. Install MySQL dan buat database baru, misalnya `belajar_db`.
+3. Clone repository ini, lalu install dependency:
+```bash
+   bun install
+```
+4. Copy `.env.example` menjadi `.env`, lalu sesuaikan `DATABASE_URL` dengan koneksi MySQL-mu:
+5. Jalankan migrasi database:
+```bash
+   bun run db:push
+```
+
+## Cara Menjalankan Aplikasi
+
+```bash
+bun run dev
+```
+
+Server berjalan di `http://localhost:3000` dengan auto-reload saat ada perubahan kode.
+
+## Cara Menjalankan Test
+
+```bash
+bun test
+```
+
+Menjalankan seluruh unit test yang ada di folder `tests/`, mencakup skenario registrasi, login, get current user, dan logout.
