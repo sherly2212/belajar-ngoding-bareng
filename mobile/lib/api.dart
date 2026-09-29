@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 // IPv4 laptop (hasil ipconfig). Kalau IP berubah, ganti di sini.
-const String baseUrl = 'http://10.13.46.147:3000/api/users';
+const String baseUrl = 'http://192.168.1.40:3000/api/users';
 
 // Fungsi bantu memanggil API (setara fungsi api() di app.js)
 class Api {
