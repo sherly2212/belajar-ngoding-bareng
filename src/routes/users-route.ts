@@ -33,7 +33,7 @@ export const usersRoute = new Elysia({ prefix: "/api/users" })
         return result;
       } catch (error: any) {
         set.status = error.status || 500;
-        return { error: error?.message || "Internal server error" };
+        return { error: error.status ? error.message : "Internal server error" };
       }
     },
     {
@@ -58,7 +58,7 @@ export const usersRoute = new Elysia({ prefix: "/api/users" })
       return result;
     } catch (error: any) {
       set.status = error.status || 500;
-      return { error: error?.message || "Internal server error" };
+      return { error: error.status ? error.message : "Internal server error" };
     }
   })
   .delete("/logout", async ({ headers, set }) => {
@@ -76,6 +76,6 @@ export const usersRoute = new Elysia({ prefix: "/api/users" })
       return result;
     } catch (error: any) {
       set.status = error.status || 500;
-      return { error: error?.message || "Internal server error" };
+      return { error: error.status ? error.message : "Internal server error" };
     }
   });
