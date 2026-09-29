@@ -1,4 +1,10 @@
-import { mysqlTable, int, varchar, timestamp } from "drizzle-orm/mysql-core";
+import {
+  mysqlTable,
+  int,
+  varchar,
+  timestamp,
+  datetime,
+} from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int().primaryKey().autoincrement(),
@@ -17,7 +23,20 @@ export const sessions = mysqlTable("sessions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const passwordResets = mysqlTable("password_resets", {
+  id: int().primaryKey().autoincrement(),
+  userId: int("user_id")
+    .notNull()
+    .references(() => users.id),
+  codeHash: varchar("code_hash", { length: 255 }).notNull(),
+  expiresAt: datetime("expires_at").notNull(),
+  attempts: int().notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
+export type PasswordReset = typeof passwordResets.$inferSelect;
+export type NewPasswordReset = typeof passwordResets.$inferInsert;
