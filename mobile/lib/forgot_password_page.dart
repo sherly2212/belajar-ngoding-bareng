@@ -1,79 +1,101 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-import 'forgot_password_page.dart';
 
 import 'api.dart';
 import 'helpers.dart';
 
-class AuthPage extends StatefulWidget {
-  final void Function(String token) onLoggedIn;
-  const AuthPage({super.key, required this.onLoggedIn});
+class ForgotPasswordPage extends StatefulWidget {
+  final String initialEmail;
+  const ForgotPasswordPage({super.key, this.initialEmail = ''});
   @override
-  State<AuthPage> createState() => _AuthPageState();
+  State<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
 }
 
-class _AuthPageState extends State<AuthPage> {
-  final nameC = TextEditingController();
-  final emailC = TextEditingController();
+class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
+  late final TextEditingController emailC;
+  final codeC = TextEditingController();
   final passC = TextEditingController();
-  bool isLogin = true;
+  bool codeSent = false;
   bool loading = false;
   bool hidePass = true;
   String message = '';
   bool ok = false;
 
   @override
+  void initState() {
+    super.initState();
+    emailC = TextEditingController(text: widget.initialEmail);
+  }
+
+  @override
   void dispose() {
-    nameC.dispose();
     emailC.dispose();
+    codeC.dispose();
     passC.dispose();
     super.dispose();
   }
 
-  Future<void> submit() async {
-    final messenger = ScaffoldMessenger.of(context);
+  void showError(String text) {
+    setState(() {
+      ok = false;
+      message = text;
+    });
+  }
+
+  Future<void> sendCode() async {
+    final email = emailC.text.trim();
+    if (email.isEmpty) {
+      showError('Email tidak boleh kosong');
+      return;
+    }
     setState(() {
       loading = true;
       message = '';
     });
     try {
-      if (isLogin) {
-        final res = await Api.request(
-          'POST',
-          '/login',
-          body: {'email': emailC.text, 'password': passC.text},
-        );
-        final token = res['data'] as String;
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', token);
-        widget.onLoggedIn(token);
-        showSnack(messenger, 'Berhasil login');
-      } else {
-        await Api.request(
-          'POST',
-          '',
-          body: {
-            'name': nameC.text,
-            'email': emailC.text,
-            'password': passC.text,
-          },
-        );
-        if (!mounted) return;
-        setState(() {
-          isLogin = true;
-          ok = true;
-          message = 'Daftar berhasil, silakan login';
-          passC.clear();
-        });
-        showSnack(messenger, 'Daftar berhasil');
-      }
-    } catch (e) {
+      await Api.request('POST', '/forgot-password', body: {'email': email});
       if (!mounted) return;
       setState(() {
-        ok = false;
-        message = e.toString();
+        codeSent = true;
+        ok = true;
+        message = 'Jika email terdaftar, kode 6 angka sudah dikirim. Cek inbox dan folder Spam.';
       });
+    } catch (e) {
+      if (!mounted) return;
+      showError(e.toString());
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> resetPassword() async {
+    final code = codeC.text.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
+      showError('Kode harus 6 angka');
+      return;
+    }
+    if (passC.text.length < 6) {
+      showError('Password baru minimal 6 karakter');
+      return;
+    }
+    setState(() {
+      loading = true;
+      message = '';
+    });
+    try {
+      await Api.request(
+        'POST',
+        '/reset-password',
+        body: {
+          'email': emailC.text.trim(),
+          'code': code,
+          'newPassword': passC.text,
+        },
+      );
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      showError(e.toString());
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -85,6 +107,7 @@ class _AuthPageState extends State<AuthPage> {
     final tt = Theme.of(context).textTheme;
 
     return Scaffold(
+      appBar: AppBar(title: const Text('Lupa password')),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -98,23 +121,25 @@ class _AuthPageState extends State<AuthPage> {
                     radius: 38,
                     backgroundColor: cs.primaryContainer,
                     child: Icon(
-                      isLogin ? Icons.lock_outline : Icons.person_add_alt_1,
+                      codeSent
+                          ? Icons.mark_email_read_outlined
+                          : Icons.lock_reset,
                       size: 38,
                       color: cs.onPrimaryContainer,
                     ),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    isLogin ? 'Selamat datang' : 'Buat akun baru',
+                    codeSent ? 'Masukkan kode' : 'Reset password',
                     style: tt.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    isLogin
-                        ? 'Masuk untuk melanjutkan'
-                        : 'Isi data di bawah untuk mendaftar',
+                    codeSent
+                        ? 'Kode 6 angka dikirim ke emailmu'
+                        : 'Kami kirim kode reset ke emailmu',
                     style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                   ),
                   const SizedBox(height: 24),
@@ -162,77 +187,59 @@ class _AuthPageState extends State<AuthPage> {
                                 ],
                               ),
                             ),
-                          if (!isLogin) ...[
-                            TextField(
-                              controller: nameC,
-                              textInputAction: TextInputAction.next,
-                              decoration: inputDeco(
-                                'Nama',
-                                Icons.person_outline,
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                          ],
                           TextField(
                             controller: emailC,
+                            enabled: !codeSent,
                             keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
-                            decoration: inputDeco('Email', Icons.mail_outline),
-                          ),
-                          const SizedBox(height: 14),
-                          TextField(
-                            controller: passC,
-                            obscureText: hidePass,
                             textInputAction: TextInputAction.done,
                             onSubmitted: (_) {
-                              if (!loading) submit();
+                              if (!loading && !codeSent) sendCode();
                             },
-                            decoration: inputDeco(
-                              'Password',
-                              Icons.lock_outline,
-                              suffix: IconButton(
-                                icon: Icon(
-                                  hidePass
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
-                                ),
-                                onPressed: () =>
-                                    setState(() => hidePass = !hidePass),
-                              ),
-                            ),
+                            decoration: inputDeco('Email', Icons.mail_outline),
                           ),
-                          if (isLogin)
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: loading
-                                    ? null
-                                    : () async {
-                                        final done = await Navigator.push<bool>(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => ForgotPasswordPage(
-                                              initialEmail: emailC.text,
-                                            ),
-                                          ),
-                                        );
-                                        if (done == true && mounted) {
-                                          setState(() {
-                                            ok = true;
-                                            message = 'Password berhasil diubah, silakan login';
-                                            passC.clear();
-                                          });
-                                        }
-                                      },
-                                child: const Text('Lupa password?'),
+                          if (codeSent) ...[
+                            const SizedBox(height: 14),
+                            TextField(
+                              controller: codeC,
+                              keyboardType: TextInputType.number,
+                              maxLength: 6,
+                              textInputAction: TextInputAction.next,
+                              decoration: inputDeco(
+                                'Kode 6 angka',
+                                Icons.pin_outlined,
                               ),
                             ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: passC,
+                              obscureText: hidePass,
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) {
+                                if (!loading) resetPassword();
+                              },
+                              decoration: inputDeco(
+                                'Password baru',
+                                Icons.lock_outline,
+                                suffix: IconButton(
+                                  icon: Icon(
+                                    hidePass
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                  ),
+                                  onPressed: () =>
+                                      setState(() => hidePass = !hidePass),
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 20),
                           SizedBox(
                             width: double.infinity,
                             height: 48,
                             child: FilledButton(
-                              onPressed: loading ? null : submit,
+                              onPressed: loading
+                                  ? null
+                                  : (codeSent ? resetPassword : sendCode),
                               child: loading
                                   ? const SizedBox(
                                       height: 22,
@@ -241,25 +248,29 @@ class _AuthPageState extends State<AuthPage> {
                                         strokeWidth: 2.5,
                                       ),
                                     )
-                                  : Text(isLogin ? 'Masuk' : 'Daftar'),
+                                  : Text(
+                                      codeSent
+                                          ? 'Simpan password'
+                                          : 'Kirim kode',
+                                    ),
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () => setState(() {
-                      isLogin = !isLogin;
-                      message = '';
-                    }),
-                    child: Text(
-                      isLogin
-                          ? 'Belum punya akun? Daftar'
-                          : 'Sudah punya akun? Login',
+                  if (codeSent)
+                    TextButton(
+                      onPressed: loading
+                          ? null
+                          : () => setState(() {
+                              codeSent = false;
+                              message = '';
+                              codeC.clear();
+                              passC.clear();
+                            }),
+                      child: const Text('Ganti email / kirim ulang kode'),
                     ),
-                  ),
                 ],
               ),
             ),
