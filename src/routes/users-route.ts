@@ -14,14 +14,14 @@ export const usersRoute = new Elysia({ prefix: "/api/users" })
           return { error: "Email sudah terdaftar" };
         }
         set.status = error.status || 500;
-        return { error: error?.message || "Internal server error" };
+        return { error: error.status ? error.message : "Internal server error" };
       }
     },
     {
       body: t.Object({
-        name: t.String({ minLength: 1 }),
-        email: t.String({ minLength: 1 }),
-        password: t.String({ minLength: 1 }),
+        name: t.String({ minLength: 3, maxLength: 255 }),
+        email: t.String({ format: "email", maxLength: 255 }),
+        password: t.String({ minLength: 6, maxLength: 255 }),
       }),
     }
   )
