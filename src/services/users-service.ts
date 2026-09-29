@@ -214,6 +214,8 @@ export async function forgotPassword(email: string) {
     try {
       await sendResetCode(email, code);
     } catch (err) {
+      // Di production, sebaiknya log error tapi jangan sampai user tahu ada error.
+      // Di tahap belajar, boleh saja console.error.
       console.error("Gagal kirim email:", err);
     }
   }
