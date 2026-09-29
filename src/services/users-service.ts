@@ -13,6 +13,16 @@ export interface LoginUserInput {
   password: string;
 }
 
+/**
+ * Mendaftarkan user baru ke dalam sistem.
+ *
+ * Mengecek apakah email sudah terdaftar, meng-hash password
+ * menggunakan bcrypt, lalu menyimpan user baru ke database.
+ *
+ * @param input - Data registrasi: name, email, password
+ * @returns Objek `{ data: "OK" }` jika berhasil
+ * @throws Error dengan status 400 jika email sudah terdaftar
+ */
 export async function registerUser(input: RegisterUserInput) {
   const existingUser = await db
     .select({ id: users.id })
@@ -42,6 +52,18 @@ export async function registerUser(input: RegisterUserInput) {
   };
 }
 
+/**
+ * Melakukan login user dan membuat session baru.
+ *
+ * Mencocokkan email dan password (dengan bcrypt verify), lalu
+ * membuat token UUID baru yang disimpan di tabel sessions.
+ * Pesan error dibuat sama untuk email tidak ada maupun password
+ * salah, agar tidak membocorkan email mana yang terdaftar.
+ *
+ * @param input - Data login: email, password
+ * @returns Objek `{ data: token }` berisi token session
+ * @throws Error dengan status 400 jika email/password salah
+ */
 export async function loginUser(input: LoginUserInput) {
   const foundUsers = await db
     .select()
@@ -51,7 +73,6 @@ export async function loginUser(input: LoginUserInput) {
 
   const user = foundUsers[0];
 
-  // Pesan error dibuat sama untuk email tidak ada dan password salah
   const loginError = new Error("Email atau password salah");
   (loginError as any).status = 400;
 
@@ -77,6 +98,16 @@ export async function loginUser(input: LoginUserInput) {
   };
 }
 
+/**
+ * Mengambil data user yang sedang login berdasarkan token session.
+ *
+ * Password tidak disertakan dalam hasil, hanya id, name, email,
+ * dan created_at.
+ *
+ * @param token - Token UUID dari tabel sessions
+ * @returns Objek `{ data: user }` berisi data user (tanpa password)
+ * @throws Error dengan status 401 jika token tidak valid
+ */
 export async function getCurrentUser(token: string) {
   const foundSessions = await db
     .select()
@@ -112,6 +143,16 @@ export async function getCurrentUser(token: string) {
   };
 }
 
+/**
+ * Melakukan logout user dengan menghapus session/token dari database.
+ *
+ * Setelah dipanggil, token yang sama tidak bisa dipakai lagi
+ * untuk mengakses endpoint yang memerlukan autentikasi.
+ *
+ * @param token - Token UUID dari tabel sessions yang akan dihapus
+ * @returns Objek `{ data: "OK" }` jika berhasil
+ * @throws Error dengan status 401 jika token tidak valid
+ */
 export async function logoutUser(token: string) {
   const foundSessions = await db
     .select()
