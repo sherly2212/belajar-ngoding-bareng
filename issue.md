@@ -1,15 +1,13 @@
-﻿# Bug Fix: Validasi Panjang Karakter pada Endpoint Registrasi
+﻿# Unit Test untuk Semua API
 
-## Tahapan Perbaikan
+## Planning
 
-### Tahap 1: Pembaruan Skema Validasi di Elysia
-Tambahkan batasan panjang pada skema registrasi (POST /api/users) agar sesuai kapasitas database. Gunakan properti maxLength dan minLength.
+Buatkan unit test untuk semua API yang tersedia.
 
-body: t.Object({
-  name: t.String({ minLength: 3, maxLength: 255 }),
-  email: t.String({ format: "email", maxLength: 255 }),
-  password: t.String({ minLength: 6, maxLength: 255 }),
-}),
+Simpan di folder tests, menggunakan bun test.
 
-### Tahap 2: Mencegah Kebocoran Error SQL
-Di blok catch route registrasi, ubah agar pesan error mentah dari database tidak ikut dikembalikan ke client. Hanya error yang sengaja dilempar sendiri (punya .status) yang boleh tampil pesannya.
+Setiap skenario, hapus datanya terlebih dahulu agar konsisten.
+
+Buat skenario test per API selengkap mungkin.
+
+Jangan buatkan terlalu detail instruksi unit testnya. Buatkan saja skenario apa yang harus di tes, biarkan nanti yang implementasi detail skenarionya adalah junior programmer atau model AI yang lebih murah.
