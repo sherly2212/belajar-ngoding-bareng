@@ -15,8 +15,32 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'Belajar Ngoding',
+    debugShowCheckedModeBanner: false,
+    themeMode: ThemeMode.system,
     theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
+    darkTheme: ThemeData(
+      colorSchemeSeed: Colors.indigo,
+      brightness: Brightness.dark,
+      useMaterial3: true,
+    ),
     home: const Gate(),
+  );
+}
+
+// Gaya kolom isian yang dipakai berulang
+InputDecoration inputDeco(String label, IconData icon, {Widget? suffix}) =>
+    InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon),
+      suffixIcon: suffix,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+    );
+
+// Pesan singkat di bawah layar
+void showSnack(ScaffoldMessengerState messenger, String text) {
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(
+    SnackBar(content: Text(text), behavior: SnackBarBehavior.floating),
   );
 }
 
@@ -72,6 +96,7 @@ class _GateState extends State<Gate> {
   void initState() {
     super.initState();
     SharedPreferences.getInstance().then((p) {
+      if (!mounted) return;
       setState(() {
         token = p.getString('token');
         loading = false;
@@ -107,10 +132,20 @@ class _AuthPageState extends State<AuthPage> {
   final passC = TextEditingController();
   bool isLogin = true;
   bool loading = false;
+  bool hidePass = true;
   String message = '';
   bool ok = false;
 
+  @override
+  void dispose() {
+    nameC.dispose();
+    emailC.dispose();
+    passC.dispose();
+    super.dispose();
+  }
+
   Future<void> submit() async {
+    final messenger = ScaffoldMessenger.of(context);
     setState(() {
       loading = true;
       message = '';
@@ -126,6 +161,7 @@ class _AuthPageState extends State<AuthPage> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('token', token);
         widget.onLoggedIn(token);
+        showSnack(messenger, 'Berhasil login');
       } else {
         await Api.request(
           'POST',
@@ -136,14 +172,17 @@ class _AuthPageState extends State<AuthPage> {
             'password': passC.text,
           },
         );
+        if (!mounted) return;
         setState(() {
           isLogin = true;
           ok = true;
           message = 'Daftar berhasil, silakan login';
           passC.clear();
         });
+        showSnack(messenger, 'Daftar berhasil');
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         ok = false;
         message = e.toString();
@@ -155,66 +194,164 @@ class _AuthPageState extends State<AuthPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Belajar Ngoding')),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          Text(
-            isLogin ? 'Login' : 'Daftar',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 12),
-          if (message.isNotEmpty)
-            Text(
-              message,
-              style: TextStyle(color: ok ? Colors.green : Colors.red),
-            ),
-          const SizedBox(height: 12),
-          if (!isLogin) ...[
-            TextField(
-              controller: nameC,
-              decoration: const InputDecoration(
-                labelText: 'Nama',
-                border: OutlineInputBorder(),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    radius: 38,
+                    backgroundColor: cs.primaryContainer,
+                    child: Icon(
+                      isLogin ? Icons.lock_outline : Icons.person_add_alt_1,
+                      size: 38,
+                      color: cs.onPrimaryContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    isLogin ? 'Selamat datang' : 'Buat akun baru',
+                    style: tt.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isLogin
+                        ? 'Masuk untuk melanjutkan'
+                        : 'Isi data di bawah untuk mendaftar',
+                    style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 24),
+                  Card(
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          if (message.isNotEmpty)
+                            Container(
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(bottom: 16),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: ok
+                                    ? Colors.green.shade100
+                                    : Colors.red.shade100,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    ok
+                                        ? Icons.check_circle_outline
+                                        : Icons.error_outline,
+                                    color: ok
+                                        ? Colors.green.shade800
+                                        : Colors.red.shade800,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      message,
+                                      style: TextStyle(
+                                        color: ok
+                                            ? Colors.green.shade900
+                                            : Colors.red.shade900,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          if (!isLogin) ...[
+                            TextField(
+                              controller: nameC,
+                              textInputAction: TextInputAction.next,
+                              decoration: inputDeco(
+                                'Nama',
+                                Icons.person_outline,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                          ],
+                          TextField(
+                            controller: emailC,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            decoration: inputDeco('Email', Icons.mail_outline),
+                          ),
+                          const SizedBox(height: 14),
+                          TextField(
+                            controller: passC,
+                            obscureText: hidePass,
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: (_) {
+                              if (!loading) submit();
+                            },
+                            decoration: inputDeco(
+                              'Password',
+                              Icons.lock_outline,
+                              suffix: IconButton(
+                                icon: Icon(
+                                  hidePass
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                ),
+                                onPressed: () =>
+                                    setState(() => hidePass = !hidePass),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: FilledButton(
+                              onPressed: loading ? null : submit,
+                              child: loading
+                                  ? const SizedBox(
+                                      height: 22,
+                                      width: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                      ),
+                                    )
+                                  : Text(isLogin ? 'Masuk' : 'Daftar'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => setState(() {
+                      isLogin = !isLogin;
+                      message = '';
+                    }),
+                    child: Text(
+                      isLogin
+                          ? 'Belum punya akun? Daftar'
+                          : 'Sudah punya akun? Login',
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-          ],
-          TextField(
-            controller: emailC,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: 'Email',
-              border: OutlineInputBorder(),
-            ),
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: passC,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Password',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: loading ? null : submit,
-            child: Text(
-              loading ? 'Memproses...' : (isLogin ? 'Masuk' : 'Daftar'),
-            ),
-          ),
-          TextButton(
-            onPressed: () => setState(() {
-              isLogin = !isLogin;
-              message = '';
-            }),
-            child: Text(
-              isLogin ? 'Belum punya akun? Daftar' : 'Sudah punya akun? Login',
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -251,48 +388,134 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> load() async {
     try {
       final res = await Api.request('GET', '/current', token: widget.token);
+      if (!mounted) return;
       setState(() {
         name = res['data']['name'];
         email = res['data']['email'];
         loading = false;
       });
-    } catch (_) {
-      // token tidak valid lagi -> kembali ke login
-      await clearToken();
-      widget.onLoggedOut();
+    } catch (e) {
+      if (!mounted) return;
+      if (e.toString().startsWith('Tidak bisa terhubung')) {
+        // server tidak terjangkau: jangan paksa logout, cukup beri tahu
+        setState(() => loading = false);
+        showSnack(ScaffoldMessenger.of(context), e.toString());
+      } else {
+        // token tidak valid lagi -> kembali ke login
+        await clearToken();
+        widget.onLoggedOut();
+      }
     }
   }
 
   Future<void> logout() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final yakin = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Keluar?'),
+        content: const Text('Kamu harus login lagi untuk masuk ke akunmu.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Keluar'),
+          ),
+        ],
+      ),
+    );
+    if (yakin != true) return;
     try {
       await Api.request('DELETE', '/logout', token: widget.token);
     } catch (_) {}
     await clearToken();
     widget.onLoggedOut();
+    showSnack(messenger, 'Berhasil logout');
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Profil kamu')),
+      appBar: AppBar(title: const Text('Profil')),
       body: loading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          : RefreshIndicator(
+              onRefresh: load,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(24),
                 children: [
-                  Text(
-                    'Nama: $name',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
                   const SizedBox(height: 8),
-                  Text(
-                    'Email: $email',
-                    style: Theme.of(context).textTheme.titleMedium,
+                  Center(
+                    child: CircleAvatar(
+                      radius: 52,
+                      backgroundColor: cs.primaryContainer,
+                      child: Text(
+                        initial,
+                        style: tt.displayMedium?.copyWith(
+                          color: cs.onPrimaryContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Text(
+                      name,
+                      style: tt.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                   const SizedBox(height: 24),
-                  FilledButton(onPressed: logout, child: const Text('Logout')),
+                  Card(
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.person_outline),
+                          title: const Text('Nama'),
+                          subtitle: Text(name),
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          leading: const Icon(Icons.mail_outline),
+                          title: const Text('Email'),
+                          subtitle: Text(email),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.red.shade600,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(48),
+                    ),
+                    onPressed: logout,
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Logout'),
+                  ),
+                  const SizedBox(height: 12),
+                  Center(
+                    child: Text(
+                      'Tarik ke bawah untuk memuat ulang',
+                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ),
                 ],
               ),
             ),
