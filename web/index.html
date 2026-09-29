@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Belajar Ngoding</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+    <main class="card">
+        <h1>Belajar Ngoding</h1>
+        <p id="pesan" class="pesan"></p>
+
+        <!-- Tampilan sebelum login -->
+        <section id="auth">
+            <form id="form-login">
+                <h2>Login</h2>
+                <input id="login-email" type="email" placeholder="Email" required />
+                <input id="login-password" type="password" placeholder="Password" required />
+                <button type="submit">Masuk</button>
+                <a href="#" id="ke-daftar">Belum punya akun? Daftar</a>
+            </form>
+
+            <form id="form-daftar" hidden>
+                <h2>Daftar</h2>
+                <input id="daftar-nama" type="text" placeholder="Nama" minlength="3" maxlength="255" required />
+                <input id="daftar-email" type="email" placeholder="Email" maxlength="255" required />
+                <input id="daftar-password" type="password" placeholder="Password" minlength="6" required />
+                <button type="submit">Daftar</button>
+                <a href="#" id="ke-login">Sudah punya akun? Login</a>
+            </form>
+        </section>
+
+        <!-- Tampilan setelah login -->
+        <section id="profil" hidden>
+            <h2>Profil kamu</h2>
+            <p>Nama: <b id="profil-nama"></b></p>
+            <p>Email: <b id="profil-email"></b></p>
+            <button id="btn-logout">Logout</button>
+        </section>
+    </main>
+    <script src="app.js"></script>
+</body>
+
+</html>
