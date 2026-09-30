@@ -16,3 +16,12 @@ void showSnack(ScaffoldMessengerState messenger, String text) {
     SnackBar(content: Text(text), behavior: SnackBarBehavior.floating),
   );
 }
+
+String? validatePassword(String p) {
+  if (p.length < 8) return 'Password minimal 8 karakter';
+  if (p.length > 100) return 'Password maksimal 100 karakter';
+  if (!RegExp(r'[A-Za-z]').hasMatch(p) || !RegExp(r'\d').hasMatch(p)) {
+    return 'Password harus mengandung huruf dan angka';
+  }
+  return null;
+}

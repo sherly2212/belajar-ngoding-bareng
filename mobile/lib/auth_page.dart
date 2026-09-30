@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'forgot_password_page.dart';
-
 import 'api.dart';
+import 'forgot_password_page.dart';
 import 'helpers.dart';
 
 class AuthPage extends StatefulWidget {
@@ -33,6 +32,19 @@ class _AuthPageState extends State<AuthPage> {
 
   Future<void> submit() async {
     final messenger = ScaffoldMessenger.of(context);
+
+    // Cek aturan password hanya saat daftar (login tidak dicek)
+    if (!isLogin) {
+      final err = validatePassword(passC.text);
+      if (err != null) {
+        setState(() {
+          ok = false;
+          message = err;
+        });
+        return;
+      }
+    }
+
     setState(() {
       loading = true;
       message = '';
@@ -201,6 +213,19 @@ class _AuthPageState extends State<AuthPage> {
                               ),
                             ),
                           ),
+                          if (!isLogin)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'Minimal 8 karakter, harus ada huruf dan angka',
+                                  style: tt.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ),
                           if (isLogin)
                             Align(
                               alignment: Alignment.centerRight,
