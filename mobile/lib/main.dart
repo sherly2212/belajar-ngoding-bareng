@@ -4,6 +4,58 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'auth_page.dart';
 import 'profile_page.dart';
 
+// Warna utama aplikasi. Ganti satu baris ini untuk mengubah tema seluruhnya.
+const Color seedColor = Color(0xFF0F766E);
+
+ThemeData buildTheme(Brightness brightness) {
+  final scheme = ColorScheme.fromSeed(
+    seedColor: seedColor,
+    brightness: brightness,
+  );
+  return ThemeData(
+    colorScheme: scheme,
+    useMaterial3: true,
+    scaffoldBackgroundColor: scheme.surface,
+    appBarTheme: AppBarTheme(
+      centerTitle: true,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      foregroundColor: scheme.onSurface,
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: scheme.outlineVariant),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: scheme.primary, width: 2),
+      ),
+    ),
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {TargetPlatform.android: ZoomPageTransitionsBuilder()},
+    ),
+  );
+}
+
 void main() => runApp(const MyApp());
 
 class MyApp extends StatelessWidget {
@@ -14,12 +66,8 @@ class MyApp extends StatelessWidget {
     title: 'Belajar Ngoding',
     debugShowCheckedModeBanner: false,
     themeMode: ThemeMode.system,
-    theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
-    darkTheme: ThemeData(
-      colorSchemeSeed: Colors.indigo,
-      brightness: Brightness.dark,
-      useMaterial3: true,
-    ),
+    theme: buildTheme(Brightness.light),
+    darkTheme: buildTheme(Brightness.dark),
     home: const Gate(),
   );
 }
