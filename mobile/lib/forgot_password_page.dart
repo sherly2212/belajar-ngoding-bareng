@@ -73,8 +73,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       showError('Kode harus 6 angka');
       return;
     }
-    if (passC.text.length < 6) {
-      showError('Password baru minimal 6 karakter');
+    final err = validatePassword(passC.text);
+    if (err != null) {
+      showError(err);
       return;
     }
     setState(() {
@@ -228,6 +229,18 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                   ),
                                   onPressed: () =>
                                       setState(() => hidePass = !hidePass),
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'Minimal 8 karakter, harus ada huruf dan angka',
+                                  style: tt.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
                                 ),
                               ),
                             ),

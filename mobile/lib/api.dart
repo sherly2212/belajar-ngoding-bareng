@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 // IPv4 laptop (hasil ipconfig). Kalau IP berubah, ganti di sini.
-const String baseUrl = 'http://192.168.1.40:3000/api/users';
+const String baseUrl = 'http://10.201.182.131:3000/api/users';
 
 // Fungsi bantu memanggil API (setara fungsi api() di app.js)
 class Api {
@@ -35,8 +35,11 @@ class Api {
       data = jsonDecode(res.body) as Map<String, dynamic>;
     } catch (_) {}
     if (res.statusCode >= 400 || data['error'] != null) {
+      final plain = res.body.trim();
+      final isPlainText =
+          plain.isNotEmpty && !plain.startsWith('{') && plain.length < 200;
       throw data['error']?.toString() ??
-          'Input tidak valid atau terjadi kesalahan';
+          (isPlainText ? plain : 'Input tidak valid atau terjadi kesalahan');
     }
     return data;
   }
