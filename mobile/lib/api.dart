@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 // IPv4 laptop (hasil ipconfig). Kalau IP berubah, ganti di sini.
-const String baseUrl = 'http://10.13.47.167:3000/api/users';
+const String baseUrl = 'http://10.201.182.131:3000/api/users';
 
 // Error dari API: berisi pesan untuk user dan kode status
 // (status null kalau server tidak terjangkau)
