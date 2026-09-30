@@ -1,8 +1,35 @@
 import { randomInt } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db } from "../db";
 import { passwordResets, sessions, users } from "../db/schema";
 import { sendResetCode } from "./email-service";
+
+const PASSWORD_UMUM = [
+  "12345678",
+  "123456789",
+  "password",
+  "password1",
+  "qwerty123",
+  "abc12345",
+  "admin123",
+];
+
+// Membuat error dengan status HTTP supaya route bisa membalas dengan benar
+function httpError(message: string, status: number) {
+  const error = new Error(message);
+  (error as any).status = status;
+  return error;
+}
+
+function cekPasswordUmum(password: string) {
+  if (PASSWORD_UMUM.includes(password.toLowerCase())) {
+    throw httpError("Password terlalu mudah ditebak", 400);
+  }
+}
+
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
 
 export interface RegisterUserInput {
   name: string;
@@ -18,24 +45,31 @@ export interface LoginUserInput {
 /**
  * Mendaftarkan user baru ke dalam sistem.
  *
- * Mengecek apakah email sudah terdaftar, meng-hash password
+ * Membersihkan nama dan email, menolak password yang terlalu umum,
+ * mengecek apakah email sudah terdaftar, meng-hash password
  * menggunakan bcrypt, lalu menyimpan user baru ke database.
  *
  * @param input - Data registrasi: name, email, password
  * @returns Objek `{ data: "OK" }` jika berhasil
- * @throws Error dengan status 400 jika email sudah terdaftar
+ * @throws Error dengan status 400 jika data tidak valid atau email sudah terdaftar
  */
 export async function registerUser(input: RegisterUserInput) {
+  const name = input.name.trim();
+  const email = normalizeEmail(input.email);
+
+  if (name.length < 3) {
+    throw httpError("Nama minimal 3 karakter", 400);
+  }
+  cekPasswordUmum(input.password);
+
   const existingUser = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.email, input.email))
+    .where(eq(users.email, email))
     .limit(1);
 
   if (existingUser.length > 0) {
-    const error = new Error("Email sudah terdaftar");
-    (error as any).status = 400;
-    throw error;
+    throw httpError("Email sudah terdaftar", 400);
   }
 
   const hashedPassword = await Bun.password.hash(input.password, {
@@ -44,8 +78,8 @@ export async function registerUser(input: RegisterUserInput) {
   });
 
   await db.insert(users).values({
-    name: input.name,
-    email: input.email,
+    name,
+    email,
     password: hashedPassword,
   });
 
@@ -67,16 +101,17 @@ export async function registerUser(input: RegisterUserInput) {
  * @throws Error dengan status 400 jika email/password salah
  */
 export async function loginUser(input: LoginUserInput) {
+  const email = normalizeEmail(input.email);
+
   const foundUsers = await db
     .select()
     .from(users)
-    .where(eq(users.email, input.email))
+    .where(eq(users.email, email))
     .limit(1);
 
   const user = foundUsers[0];
 
-  const loginError = new Error("Email atau password salah");
-  (loginError as any).status = 400;
+  const loginError = httpError("Email atau password salah", 400);
 
   if (!user) {
     throw loginError;
@@ -118,9 +153,7 @@ export async function getCurrentUser(token: string) {
     .limit(1);
 
   if (!foundSessions[0]) {
-    const error = new Error("Unauthorized");
-    (error as any).status = 401;
-    throw error;
+    throw httpError("Unauthorized", 401);
   }
 
   const foundUsers = await db
@@ -135,13 +168,134 @@ export async function getCurrentUser(token: string) {
     .limit(1);
 
   if (!foundUsers[0]) {
-    const error = new Error("Unauthorized");
-    (error as any).status = 401;
-    throw error;
+    throw httpError("Unauthorized", 401);
   }
 
   return {
     data: foundUsers[0],
+  };
+}
+
+/**
+ * Mengubah nama user yang sedang login.
+ *
+ * @param token - Token session user
+ * @param newName - Nama baru (minimal 3 karakter setelah dirapikan)
+ * @returns Objek `{ data: "OK" }` jika berhasil
+ * @throws Error dengan status 400 jika nama tidak valid, 401 jika token tidak valid
+ */
+export async function updateProfile(token: string, newName: string) {
+  const { data: current } = await getCurrentUser(token);
+
+  const name = newName.trim();
+  if (name.length < 3) {
+    throw httpError("Nama minimal 3 karakter", 400);
+  }
+
+  await db.update(users).set({ name }).where(eq(users.id, current.id));
+
+  return {
+    data: "OK",
+  };
+}
+
+/**
+ * Mengganti password user yang sedang login.
+ *
+ * Password lama harus benar. Setelah berhasil, semua session lain
+ * dihapus (perangkat lain harus login ulang), sedangkan session
+ * yang sedang dipakai tetap hidup.
+ *
+ * @param token - Token session user
+ * @param oldPassword - Password lama
+ * @param newPassword - Password baru
+ * @returns Objek `{ data: "OK" }` jika berhasil
+ * @throws Error dengan status 400 jika password lama salah atau password baru tidak valid
+ */
+export async function changePassword(
+  token: string,
+  oldPassword: string,
+  newPassword: string
+) {
+  const { data: current } = await getCurrentUser(token);
+
+  const foundUsers = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, current.id))
+    .limit(1);
+
+  const user = foundUsers[0];
+  if (!user) {
+    throw httpError("Unauthorized", 401);
+  }
+
+  const isMatch = await Bun.password.verify(oldPassword, user.password);
+  if (!isMatch) {
+    throw httpError("Password lama salah", 400);
+  }
+
+  if (oldPassword === newPassword) {
+    throw httpError("Password baru harus berbeda dari password lama", 400);
+  }
+  cekPasswordUmum(newPassword);
+
+  const hashedPassword = await Bun.password.hash(newPassword, {
+    algorithm: "bcrypt",
+    cost: 10,
+  });
+
+  await db
+    .update(users)
+    .set({ password: hashedPassword })
+    .where(eq(users.id, user.id));
+
+  // keluarkan perangkat lain, session yang sedang dipakai tetap hidup
+  await db
+    .delete(sessions)
+    .where(and(eq(sessions.userId, user.id), ne(sessions.token, token)));
+
+  return {
+    data: "OK",
+  };
+}
+
+/**
+ * Menghapus akun user yang sedang login beserta data terkaitnya.
+ *
+ * Meminta password sebagai konfirmasi. Kode reset dan semua session
+ * dihapus lebih dulu, baru user-nya.
+ *
+ * @param token - Token session user
+ * @param password - Password saat ini (konfirmasi)
+ * @returns Objek `{ data: "OK" }` jika berhasil
+ * @throws Error dengan status 400 jika password salah
+ */
+export async function deleteAccount(token: string, password: string) {
+  const { data: current } = await getCurrentUser(token);
+
+  const foundUsers = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, current.id))
+    .limit(1);
+
+  const user = foundUsers[0];
+  if (!user) {
+    throw httpError("Unauthorized", 401);
+  }
+
+  const isMatch = await Bun.password.verify(password, user.password);
+  if (!isMatch) {
+    throw httpError("Password salah", 400);
+  }
+
+  await db.delete(passwordResets).where(eq(passwordResets.userId, user.id));
+  await db.delete(sessions).where(eq(sessions.userId, user.id));
+  await db.delete(users).where(eq(users.id, user.id));
+
+  return {
+    data: "OK",
   };
 }
 
@@ -163,9 +317,7 @@ export async function logoutUser(token: string) {
     .limit(1);
 
   if (!foundSessions[0]) {
-    const error = new Error("Unauthorized");
-    (error as any).status = 401;
-    throw error;
+    throw httpError("Unauthorized", 401);
   }
 
   await db.delete(sessions).where(eq(sessions.token, token));
@@ -183,10 +335,12 @@ export async function logoutUser(token: string) {
  * untuk email terdaftar maupun tidak, agar tidak membocorkan
  * email mana yang punya akun.
  *
- * @param email - Email akun yang lupa password
+ * @param rawEmail - Email akun yang lupa password
  * @returns Objek `{ data: pesan }`
  */
-export async function forgotPassword(email: string) {
+export async function forgotPassword(rawEmail: string) {
+  const email = normalizeEmail(rawEmail);
+
   const foundUsers = await db
     .select({ id: users.id })
     .from(users)
@@ -225,28 +379,31 @@ export async function forgotPassword(email: string) {
   };
 }
 
-
 /**
  * Mengganti password memakai kode reset.
  *
  * Kode harus cocok, belum kedaluwarsa, dan belum terlalu sering
  * salah dimasukkan (maksimal 5 kali). Setelah berhasil, kode
  * dihapus dan semua session user dihapus agar perangkat lain
- * harus login ulang. Semua kegagalan memakai pesan yang sama.
+ * harus login ulang. Semua kegagalan kode memakai pesan yang sama.
  *
- * @param email - Email akun
+ * @param rawEmail - Email akun
  * @param code - Kode 6 angka dari email
  * @param newPassword - Password baru
  * @returns Objek `{ data: "OK" }` jika berhasil
  * @throws Error dengan status 400 jika kode tidak valid atau kedaluwarsa
  */
 export async function resetPassword(
-  email: string,
+  rawEmail: string,
   code: string,
   newPassword: string
 ) {
-  const invalidError = new Error("Kode tidak valid atau sudah kedaluwarsa");
-  (invalidError as any).status = 400;
+  const email = normalizeEmail(rawEmail);
+
+  // dicek paling awal supaya kode tidak terbuang gara-gara password lemah
+  cekPasswordUmum(newPassword);
+
+  const invalidError = httpError("Kode tidak valid atau sudah kedaluwarsa", 400);
 
   const foundUsers = await db
     .select({ id: users.id })

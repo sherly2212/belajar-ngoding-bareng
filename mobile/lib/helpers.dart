@@ -25,3 +25,19 @@ String? validatePassword(String p) {
   }
   return null;
 }
+
+String? validateName(String n) {
+  final t = n.trim();
+  if (t.length < 3) return 'Nama minimal 3 karakter';
+  if (t.length > 255) return 'Nama maksimal 255 karakter';
+  return null;
+}
+
+String? validateEmail(String e) {
+  final t = e.trim();
+  if (t.isEmpty) return 'Email tidak boleh kosong';
+  if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(t)) {
+    return 'Format email tidak valid';
+  }
+  return null;
+}
