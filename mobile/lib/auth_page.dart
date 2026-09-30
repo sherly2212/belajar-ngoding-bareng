@@ -16,6 +16,7 @@ class _AuthPageState extends State<AuthPage> {
   final nameC = TextEditingController();
   final emailC = TextEditingController();
   final passC = TextEditingController();
+  final confirmC = TextEditingController();
   bool isLogin = true;
   bool loading = false;
   bool hidePass = true;
@@ -27,20 +28,36 @@ class _AuthPageState extends State<AuthPage> {
     nameC.dispose();
     emailC.dispose();
     passC.dispose();
+    confirmC.dispose();
     super.dispose();
+  }
+
+  void showError(String text) {
+    setState(() {
+      ok = false;
+      message = text;
+    });
   }
 
   Future<void> submit() async {
     final messenger = ScaffoldMessenger.of(context);
+    final email = emailC.text.trim();
 
-    // Cek aturan password hanya saat daftar (login tidak dicek)
-    if (!isLogin) {
-      final err = validatePassword(passC.text);
+    if (isLogin) {
+      if (email.isEmpty || passC.text.isEmpty) {
+        showError('Email dan password tidak boleh kosong');
+        return;
+      }
+    } else {
+      final err =
+          validateName(nameC.text) ??
+          validateEmail(email) ??
+          validatePassword(passC.text) ??
+          (confirmC.text != passC.text
+              ? 'Konfirmasi password tidak sama'
+              : null);
       if (err != null) {
-        setState(() {
-          ok = false;
-          message = err;
-        });
+        showError(err);
         return;
       }
     }
@@ -54,7 +71,7 @@ class _AuthPageState extends State<AuthPage> {
         final res = await Api.request(
           'POST',
           '/login',
-          body: {'email': emailC.text, 'password': passC.text},
+          body: {'email': email, 'password': passC.text},
         );
         final token = res['data'] as String;
         final prefs = await SharedPreferences.getInstance();
@@ -66,8 +83,8 @@ class _AuthPageState extends State<AuthPage> {
           'POST',
           '',
           body: {
-            'name': nameC.text,
-            'email': emailC.text,
+            'name': nameC.text.trim(),
+            'email': email,
             'password': passC.text,
           },
         );
@@ -77,15 +94,13 @@ class _AuthPageState extends State<AuthPage> {
           ok = true;
           message = 'Daftar berhasil, silakan login';
           passC.clear();
+          confirmC.clear();
         });
         showSnack(messenger, 'Daftar berhasil');
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        ok = false;
-        message = e.toString();
-      });
+      showError(e.toString());
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -137,139 +152,173 @@ class _AuthPageState extends State<AuthPage> {
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(20),
-                      child: Column(
-                        children: [
-                          if (message.isNotEmpty)
-                            Container(
-                              width: double.infinity,
-                              margin: const EdgeInsets.only(bottom: 16),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: ok
-                                    ? Colors.green.shade100
-                                    : Colors.red.shade100,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    ok
-                                        ? Icons.check_circle_outline
-                                        : Icons.error_outline,
-                                    color: ok
-                                        ? Colors.green.shade800
-                                        : Colors.red.shade800,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      message,
-                                      style: TextStyle(
-                                        color: ok
-                                            ? Colors.green.shade900
-                                            : Colors.red.shade900,
+                      child: AutofillGroup(
+                        child: Column(
+                          children: [
+                            if (message.isNotEmpty)
+                              Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(bottom: 16),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: ok
+                                      ? Colors.green.shade100
+                                      : Colors.red.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      ok
+                                          ? Icons.check_circle_outline
+                                          : Icons.error_outline,
+                                      color: ok
+                                          ? Colors.green.shade800
+                                          : Colors.red.shade800,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        message,
+                                        style: TextStyle(
+                                          color: ok
+                                              ? Colors.green.shade900
+                                              : Colors.red.shade900,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          if (!isLogin) ...[
+                            if (!isLogin) ...[
+                              TextField(
+                                controller: nameC,
+                                textInputAction: TextInputAction.next,
+                                autofillHints: const [AutofillHints.name],
+                                decoration: inputDeco(
+                                  'Nama',
+                                  Icons.person_outline,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                            ],
                             TextField(
-                              controller: nameC,
+                              controller: emailC,
+                              keyboardType: TextInputType.emailAddress,
                               textInputAction: TextInputAction.next,
+                              autofillHints: const [AutofillHints.email],
                               decoration: inputDeco(
-                                'Nama',
-                                Icons.person_outline,
+                                'Email',
+                                Icons.mail_outline,
                               ),
                             ),
                             const SizedBox(height: 14),
-                          ],
-                          TextField(
-                            controller: emailC,
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
-                            decoration: inputDeco('Email', Icons.mail_outline),
-                          ),
-                          const SizedBox(height: 14),
-                          TextField(
-                            controller: passC,
-                            obscureText: hidePass,
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) {
-                              if (!loading) submit();
-                            },
-                            decoration: inputDeco(
-                              'Password',
-                              Icons.lock_outline,
-                              suffix: IconButton(
-                                icon: Icon(
-                                  hidePass
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
+                            TextField(
+                              controller: passC,
+                              obscureText: hidePass,
+                              textInputAction: isLogin
+                                  ? TextInputAction.done
+                                  : TextInputAction.next,
+                              autofillHints: [
+                                isLogin
+                                    ? AutofillHints.password
+                                    : AutofillHints.newPassword,
+                              ],
+                              onSubmitted: (_) {
+                                if (isLogin && !loading) submit();
+                              },
+                              decoration: inputDeco(
+                                'Password',
+                                Icons.lock_outline,
+                                suffix: IconButton(
+                                  icon: Icon(
+                                    hidePass
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                  ),
+                                  onPressed: () =>
+                                      setState(() => hidePass = !hidePass),
                                 ),
-                                onPressed: () =>
-                                    setState(() => hidePass = !hidePass),
                               ),
                             ),
-                          ),
-                          if (!isLogin)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  'Minimal 8 karakter, harus ada huruf dan angka',
-                                  style: tt.bodySmall?.copyWith(
-                                    color: cs.onSurfaceVariant,
+                            if (!isLogin) ...[
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Minimal 8 karakter, harus ada huruf dan angka',
+                                    style: tt.bodySmall?.copyWith(
+                                      color: cs.onSurfaceVariant,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          if (isLogin)
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: loading
-                                    ? null
-                                    : () async {
-                                        final done = await Navigator.push<bool>(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => ForgotPasswordPage(
-                                              initialEmail: emailC.text,
-                                            ),
-                                          ),
-                                        );
-                                        if (done == true && mounted) {
-                                          setState(() {
-                                            ok = true;
-                                            message = 'Password berhasil diubah, silakan login';
-                                            passC.clear();
-                                          });
-                                        }
-                                      },
-                                child: const Text('Lupa password?'),
+                              const SizedBox(height: 14),
+                              TextField(
+                                controller: confirmC,
+                                obscureText: hidePass,
+                                textInputAction: TextInputAction.done,
+                                autofillHints: const [
+                                  AutofillHints.newPassword,
+                                ],
+                                onSubmitted: (_) {
+                                  if (!loading) submit();
+                                },
+                                decoration: inputDeco(
+                                  'Konfirmasi password',
+                                  Icons.lock_outline,
+                                ),
+                              ),
+                            ],
+                            if (isLogin)
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: loading
+                                      ? null
+                                      : () async {
+                                          final done =
+                                              await Navigator.push<bool>(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      ForgotPasswordPage(
+                                                        initialEmail:
+                                                            emailC.text,
+                                                      ),
+                                                ),
+                                              );
+                                          if (done == true && mounted) {
+                                            setState(() {
+                                              ok = true;
+                                              message = 'Password berhasil diubah, silakan login';
+                                              passC.clear();
+                                            });
+                                          }
+                                        },
+                                  child: const Text('Lupa password?'),
+                                ),
+                              ),
+                            const SizedBox(height: 20),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: FilledButton(
+                                onPressed: loading ? null : submit,
+                                child: loading
+                                    ? const SizedBox(
+                                        height: 22,
+                                        width: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                        ),
+                                      )
+                                    : Text(isLogin ? 'Masuk' : 'Daftar'),
                               ),
                             ),
-                          const SizedBox(height: 20),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: FilledButton(
-                              onPressed: loading ? null : submit,
-                              child: loading
-                                  ? const SizedBox(
-                                      height: 22,
-                                      width: 22,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                      ),
-                                    )
-                                  : Text(isLogin ? 'Masuk' : 'Daftar'),
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -278,6 +327,7 @@ class _AuthPageState extends State<AuthPage> {
                     onPressed: () => setState(() {
                       isLogin = !isLogin;
                       message = '';
+                      confirmC.clear();
                     }),
                     child: Text(
                       isLogin
