@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
 import 'helpers.dart';
+import 'wilayah_page.dart'; // BARU
 
 // Penanda: sesi sudah tidak berlaku (token ditolak server)
 class _SessionExpired {
@@ -225,6 +226,21 @@ class _ProfilePageState extends State<ProfilePage> {
                           title: const Text('Ubah password'),
                           trailing: const Icon(Icons.chevron_right),
                           onTap: changePassword,
+                        ),
+                        const Divider(height: 1), // BARU
+                        ListTile(
+                          // BARU
+                          leading: const Icon(Icons.map_outlined),
+                          title: const Text('Lihat Kab/Kota Sumbar'),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const WilayahPage(),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
