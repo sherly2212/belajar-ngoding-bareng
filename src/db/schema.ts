@@ -34,9 +34,36 @@ export const passwordResets = mysqlTable("password_resets", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ---------- Rekap BPS (BARU) ----------
+
+// Daftar satker (kab/kota). Kode 4 digit jadi kunci penghubung semua sumber data.
+export const satker = mysqlTable("satker", {
+  kode: varchar({ length: 4 }).primaryKey(),
+  nama: varchar({ length: 255 }).notNull(),
+});
+
+// Data mentah kegiatan hasil impor dari sumber (sementara: mock DNA).
+// id diambil dari sumber, jadi tidak autoincrement.
+export const kegiatan = mysqlTable("kegiatan", {
+  id: int().primaryKey(),
+  idIndah: int("id_indah"),
+  title: varchar({ length: 500 }).notNull(),
+  year: int().notNull(),
+  satkerKode: varchar("satker_kode", { length: 4 })
+    .notNull()
+    .references(() => satker.kode),
+  statisticsType: varchar("statistics_type", { length: 50 }),
+  collectionType: varchar("collection_type", { length: 50 }),
+  status: varchar({ length: 50 }).notNull(),
+  importedAt: timestamp("imported_at").defaultNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
 export type PasswordReset = typeof passwordResets.$inferSelect;
 export type NewPasswordReset = typeof passwordResets.$inferInsert;
+export type Satker = typeof satker.$inferSelect;
+export type Kegiatan = typeof kegiatan.$inferSelect;
+export type NewKegiatan = typeof kegiatan.$inferInsert;
